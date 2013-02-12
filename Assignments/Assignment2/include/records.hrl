@@ -1,1 +1,5 @@
 -record(address,{ms=none,bs=none,bsc=none,msc=none,newbsc=none,newbs=none}).
+-record(bs_state, {bsc}).
+-record(ms_state, {bs,signals,tch=none,tref=none}).
+-record(bsc_state, {msc,bss=none,allocated=none,channels=[],inhandoff=dict:new()}).
+-record(msc_state, {}).
