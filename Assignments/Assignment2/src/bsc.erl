@@ -13,17 +13,17 @@
 start_link({MSC}) ->
     gen_server:start_link(?MODULE,[{MSC}],[]).
 
-send_ho_req_bsc(#state{bsc=BSC},{Address,Measurements}) ->
-    gen_server:cast(BSC, {ho_request_bs,Address#address{bs=self()},Measurements}).
+send_ho_req_msc(S,{A#address{msc=MSC},Measurements}) ->
+    gen_server:cast(MSC, {ho_req_msc,Address#address{bs=self()},Measurements}).
 
-send_ho_command(#state{bsc=BSC},{Address,Measurements}) ->
-    gen_server:cast(BSC, {ho_request_bs,Address#address{bs=self()},Measurements}).
+send_ho_command_bs(S,{A#address{newbs=BS}}) ->
+    gen_server:cast(BS, {ho_command_bs,Address#address{bs=self()}}).
 
-send_ho_ack_tobs(#state{bsc=BSC},{Address,Measurements}) ->
-    gen_server:cast(BSC, {ho_request_bs,Address#address{bs=self()},Measurements}).
+send_ho_ack_bs(S,{A#address{bs=BS}}) ->
+    gen_server:cast(BS, {ho_ack_bs,Address#address{bs=self()}}).
 
-send_ho_req_bsc(#state{bsc=BSC},{Address,Measurements}) ->
-    gen_server:cast(BSC, {ho_request_bs,Address#address{bs=self()},Measurements}).
+send_ho_ack_msc(S,{A#address{msc=MSC}}) ->
+    gen_server:cast(MSC, {ho_ack_bs,Address#address{bs=self()}}).
 
 
 %% For gen_server
