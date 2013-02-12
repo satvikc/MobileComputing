@@ -2,20 +2,23 @@
 -compile(export_all).
 -behaviour(gen_server).
 -include("../include/constants.hrl").
+-include("../include/records.hrl").
 -export([start_link/1,init/1,handle_cast/2,handle_info/2]).
 
 -record(state, {bs,signals,tch=none,tref=none}).
 
 %% NOTE: handle measurements at MSC when already a handoff is in progress.
+%% Define terminate to cancel timer.
 
 start_link({Base,Bases}) ->
     gen_server:start_link(?MODULE,[{Base,Bases}],[]).
 
-send_measurements(#state{bs=BS,signals=Signals}) ->
-    gen_server:cast(BS, {measurements,list:sublist(Signals,6)}).
+send_measurements(#state{bs=
+BS,signals=Signals}) ->
+    gen_server:cast(BS, {measurements,#address{ms=self()},list:sublist(Signals,6)}).
 
-send_link_activation(NewBS) ->
-    gen_server:call(NewBS,{link_active_request}).
+send_link_active_request(NewBS) ->
+    gen_server:call(NewBS,{link_active_request,#address{ms=self()}).
 
 %% For gen_server
 
@@ -31,7 +34,7 @@ init({Base,Bases}) ->
 %% Link active received. Update the BS to new BS and send link active
 %% request to the new BS
 handle_cast({link_active,NewBS},S) ->
-    send_link_activation(NewBS),
+    send_link_active_request(NewBS),
     {noreply,S#state{bs=NewBS}};
 
 %% Link establishment successful so call can continue on the new TCH.
