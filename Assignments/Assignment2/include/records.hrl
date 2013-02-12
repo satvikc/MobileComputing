@@ -1,1 +1,1 @@
--record(address,{ms=none,bs=none,bsc=none}).
+-record(address,{ms=none,bs=none,bsc=none,msc=none,newbsc=none,newbs=none}).

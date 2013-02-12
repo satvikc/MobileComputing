@@ -13,12 +13,11 @@
 start_link({Base,Bases}) ->
     gen_server:start_link(?MODULE,[{Base,Bases}],[]).
 
-send_measurements(#state{bs=
-BS,signals=Signals}) ->
+send_measurements(#state{bs=BS,signals=Signals}) ->
     gen_server:cast(BS, {measurements,#address{ms=self()},list:sublist(Signals,6)}).
 
-send_link_active_request(NewBS) ->
-    gen_server:call(NewBS,{link_active_request,#address{ms=self()}).
+send_link_active_request(A=#address{newbs=NewBS}) ->
+    gen_server:call(NewBS,{link_active_request,A).
 
 %% For gen_server
 
@@ -33,16 +32,16 @@ init({Base,Bases}) ->
 
 %% Link active received. Update the BS to new BS and send link active
 %% request to the new BS
-handle_cast({link_active,NewBS},S) ->
-    send_link_active_request(NewBS),
+handle_cast({link_active,A},S) ->
+    send_link_active_request(A),
     {noreply,S#state{bs=NewBS}};
 
 %% Link establishment successful so call can continue on the new TCH.
-handle_cast({list_establishment_ok,Channel},S) ->
+handle_cast({list_establishment_ok,A,Channel},S) ->
     {noreply,S#state{tch=Channel}};
 
 %% Link establishment has failed to call has to be dropped.
-handle_cast({link_establishment_error},S) ->
+handle_cast({link_establishment_error,A},S) ->
     io:format("[MS ~p]: handoff failed",[self()]),
     {noreply,S#state{tch=none}}.
 
