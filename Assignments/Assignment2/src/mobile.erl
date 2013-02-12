@@ -17,7 +17,7 @@ send_measurements(#state{bs=BS,signals=Signals}) ->
     gen_server:cast(BS, {measurements,#address{ms=self()},list:sublist(Signals,6)}).
 
 send_link_active_request(A=#address{newbs=NewBS}) ->
-    gen_server:call(NewBS,{link_active_request,A).
+    gen_server:call(NewBS,{link_active_request,A}).
 
 %% For gen_server
 
@@ -34,7 +34,7 @@ init({Base,Bases}) ->
 %% request to the new BS
 handle_cast({link_active,A},S) ->
     send_link_active_request(A),
-    {noreply,S#state{bs=NewBS}};
+    {noreply,S#state{bs=A#address.newbs}};
 
 %% Link establishment successful so call can continue on the new TCH.
 handle_cast({list_establishment_ok,A,Channel},S) ->

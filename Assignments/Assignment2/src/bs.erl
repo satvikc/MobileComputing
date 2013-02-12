@@ -13,8 +13,8 @@
 start_link({BSC,Channels}) ->
     gen_server:start_link(?MODULE,[{BSC,Channels}],[]).
 
-send_ho_req_bs(#state{bsc=BSC},{A,Measurements}) ->
-    gen_server:cast(BSC, {ho_request_bs,A#address{bs=self()},Measurements}).
+send_ho_req_bsc(#state{bsc=BSC},{A,Measurements}) ->
+    gen_server:cast(BSC, {ho_request_bsc,A#address{bs=self()},Measurements}).
 
 send_link_active(S,A=#address{ms=MS}) ->
     gen_server:cast(MS,{link_active,A}).
@@ -36,10 +36,10 @@ init({BSC,Channels}) ->
     {ok, #state{bsc=BSC,channels=Channels}}.
 
 handle_cast({measurements,A,List},S) ->
-    send_ho_req_bs(S,{A,List}),
+    send_ho_req_bsc(S,{A,List}),
     {noreply,S};
 
-handle_cast({ho_command_bsc,A},S) ->
+handle_cast({ho_command_bs,A},S) ->
     send_activation(S,A),
     {noreply,S};
 

@@ -8,32 +8,28 @@
 %% bsc = base station controller of this base station
 %% allocated = dict of key = channel id and value = mobile station.
 %% channels = list of available channels
--record(state, {bsc,allocated=none,channels=[]}).
+-record(state, {msc,bscs=none}).
 
-start_link({BSC,Channels}) ->
-    gen_server:start_link(?MODULE,[{BSC,Channels}],[]).
+start_link({MSC}) ->
+    gen_server:start_link(?MODULE,[{MSC}],[]).
 
-send_ho_req_bs(#state{bsc=BSC},{Address,Measurements}) ->
+send_ho_req_bsc(#state{bsc=BSC},{Address,Measurements}) ->
     gen_server:cast(BSC, {ho_request_bs,Address#address{bs=self()},Measurements}).
 
-send_link_active(#address{ms=MS},NewAddress) ->
-    gen_server:cast(MS,{link_active,NewAddress}).
+send_ho_command(#state{bsc=BSC},{Address,Measurements}) ->
+    gen_server:cast(BSC, {ho_request_bs,Address#address{bs=self()},Measurements}).
 
-send_activation(#state{bsc=BSC},Address) ->
-    gen_server:cast(BSC,{activation,Address,#address{bs=self()}}).
+send_ho_ack_tobs(#state{bsc=BSC},{Address,Measurements}) ->
+    gen_server:cast(BSC, {ho_request_bs,Address#address{bs=self()},Measurements}).
 
-send_link_establishment(MS,S=#state{allocated=A,channels=Chs}) ->
-    case Chs of
-	[] -> gen_server:cast(MS,{link_establishment_fail}),
-	      S#state{channels=[]};
-	[H|T] -> gen_server:cast(MS,{link_establishment_ok,H}),
-		 S#state{allocated=dict:store(H,MS,A),channels=T}
-    end.
+send_ho_req_bsc(#state{bsc=BSC},{Address,Measurements}) ->
+    gen_server:cast(BSC, {ho_request_bs,Address#address{bs=self()},Measurements}).
+
 
 %% For gen_server
 
-init({BSC,Channels}) ->
-    {ok, #state{bsc=BSC,channels=Channels}}.
+init({MSC}) ->
+    {ok, #state{msc=MSC}}.
 
 handle_cast({measurements,A,List},S) ->
     send_ho_req_bs(S,{A,List}),
