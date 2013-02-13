@@ -12,12 +12,12 @@ start_link({Base,Bases}) ->
     gen_server:start_link(?MODULE,[Base,Bases],[]).
 
 send_measurements(#ms_state{bs=BS,signals=Signals}) ->
-    io:format("[Mobile ~p] send measurements ~p to ~p~n",[self(),Signals,BS]), 
-    gen_server:cast(BS, {measurements,?SACCH,#address{ms=self()},takeTop(Signals,6)}).
+    io:format("[Mobile ~p] send measurements to ~p ~n",[self(),BS]), 
+    gen_server:cast(BS, {measurements,#address{ms=self()},?SACCH,takeTop(Signals,6)}).
 
 send_link_active_request(A=#address{newbs=NewBS},Channel) ->
     io:format("[Mobile ~p] send link active request to ~p over channel ~p~n",[self(),NewBS,Channel]), 
-    gen_server:call(NewBS,{link_active_request,A,Channel}).
+    gen_server:cast(NewBS,{link_active_request,A,Channel}).
 
 %% For gen_server
 
@@ -27,19 +27,25 @@ init([Base,Bases]) ->
     SignalList = lists:map(fun(L) -> {L,random_number(100)} end,Bases),
     Signals = dict:from_list(SignalList),
     S = #ms_state{bs=Base,signals=dict:store(Base,100,Signals)},
-    {ok,TRef} = timer:apply_after(?MEASURETIME,?MODULE,send_measurements,[S]),
-    {ok, S#ms_state{tref=TRef}}.
+    Channel = gen_server:call(Base,{getChannel,self()}),
+    case Channel of
+	none -> io:format("[Mobile ~p] Can not initiate call so terminating~n",[self()]),
+		{stop,"No Empty Channel"};
+	Ch ->   {ok,TRef} = timer:send_after(?MEASURETIME,{timer,measuretime}),
+		{ok, S#ms_state{tref=TRef,tch=Ch}}
+    end.
 
 %% Link active received. Update the BS to new BS and send link active
 %% request to the new BS
-handle_cast({link_active,A,Ch},S) ->
+handle_cast({link_active,A,ACh,Ch},S) ->
+    io:format("[Mobile ~p] received link active on channel ~p~n",[self(),ACh]), 
     send_link_active_request(A,Ch),
     {noreply,S#ms_state{bs=A#address.newbs}};
 
 %% Link establishment successful so call can continue on the new TCH.
-handle_cast({list_establishment,_,_},S) ->
-    io:format("[MS ~p] Handover complete~n",[self()]), 
-    {noreply,S}.
+handle_cast({link_establishment,#address{newbs=NewBS},_},S) ->
+    io:format("[MS ~p] Handover complete to BS ~p~n",[self(),NewBS]), 
+    {noreply,S#ms_state{bs=NewBS}}.
 
 %% helper call to check state
 handle_call({get,state},_,S) ->
@@ -47,15 +53,16 @@ handle_call({get,state},_,S) ->
 
 
 %% For timer events to send measurements every 480ms.
-handle_info({ok,TRef},S) ->
-    {ok,TRef} = timer:apply_after(?MEASURETIME,?MODULE,send_measurements,[S]),
+handle_info({timer,measuretime},S) ->
+    send_measurements(S),
+    {ok,TRef} = timer:send_after(?MEASURETIME,{timer,measuretime}),
     {noreply,S#ms_state{tref=TRef}};
 
 handle_info({From,get,state},S) ->
     From ! S,
     {noreply,S};
 
-handle_info({_,change,signal,Val},S=#ms_state{bs=BS,signals=Sig}) ->
+handle_info({_,set,signal,Val},S=#ms_state{bs=BS,signals=Sig}) ->
     NewS = S#ms_state{signals=dict:store(BS,Val,Sig)}, 
     {noreply,NewS}.
 
