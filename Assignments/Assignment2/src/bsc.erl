@@ -3,28 +3,33 @@
 -behaviour(gen_server).
 -include("../include/constants.hrl").
 -include("../include/records.hrl").
--export([start_link/1,init/1,handle_cast/2,handle_call/3]).
+-export([start_link/1,init/1,handle_cast/2,handle_call/3,handle_info/2,code_change/3,terminate/2]).
 
 start_link({MSC}) ->
-    gen_server:start_link(?MODULE,[{MSC}],[]).
+    gen_server:start_link(?MODULE,[MSC],[]).
 
 send_ho_req_msc(_,{A=#address{msc=MSC}}) ->
+    io:format("[BSC ~p] send ho request to MSC ~p~n",[self(),MSC]), 
     gen_server:cast(MSC, {ho_req_msc,A#address{bsc=self()}}).
 
 send_ho_command_newbs(_,{A=#address{newbs=BS}}) ->
+    io:format("[BSC ~p] send ho command to BS ~p~n",[self(),BS]), 
     gen_server:cast(BS, {ho_command_newbs,A}).
 
 send_ho_ack_bs(_,{A=#address{bs=BS},Ch}) ->
+    io:format("[BSC ~p] send ho ack to BS ~p~n",[self(),BS]), 
     gen_server:cast(BS, {ho_ack_bs,A,Ch}).
 
 send_ho_ack_msc_ok(_,{A=#address{msc=MSC},Ch}) ->
+    io:format("[BSC ~p] send ho ack ok to MSC ~p~n",[self(),MSC]), 
     gen_server:cast(MSC, {ho_ack_msc_ok,A,Ch}).
 
 send_ho_ack_msc_fail(_,{A=#address{msc=MSC}}) ->
+    io:format("[BSC ~p] send ho ack fail to MSC ~p~n",[self(),MSC]), 
     gen_server:cast(MSC, {ho_ack_msc_fail,A}).
 
 %% For gen_server
-init({MSC}) ->
+init([MSC]) ->
     {ok, #bsc_state{msc=MSC,channels=list:seq(0,97)}}.
 
 handle_cast({ho_req_bsc,A,Dict},S) ->
@@ -49,6 +54,15 @@ handle_cast({activation,A=#address{ms=MS}},S=#bsc_state{channels=Chs,allocated=A
 
 handle_cast({ho_command_bsc,A,Ch},S) ->
     send_ho_ack_bs(S,{A,Ch}),
+    {noreply,S}.
+
+terminate(_Reason,_State) ->
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+handle_info(_,S) ->
     {noreply,S}.
 
 %% helper call to check state
