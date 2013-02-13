@@ -12,7 +12,7 @@ start_link({Base,Bases}) ->
     gen_server:start_link(?MODULE,[Base,Bases],[]).
 
 send_measurements(#ms_state{bs=BS,signals=Signals}) ->
-    io:format("[Mobile ~p] send measurements to ~p ~n",[self(),BS]), 
+    io:format("[Mobile ~p] send measurements to BS ~p ~n",[self(),BS]), 
     gen_server:cast(BS, {measurements,#address{ms=self()},?SACCH,takeTop(Signals,6)}).
 
 send_link_active_request(A=#address{newbs=NewBS},Channel) ->
