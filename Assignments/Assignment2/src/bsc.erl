@@ -50,9 +50,13 @@ handle_cast({ho_req_bsc,A=#address{ms=MS},Dict},S=#bsc_state{inhandoff=In}) ->
 	       true  -> S;
 	       false -> case takeDecision(A#address{bsc=self()},Dict,S) of
 			    none -> S;
-			    Ad -> New = S#bsc_state{inhandoff=dict:store(MS,true,In)}, 
-				 send_ho_req_msc(New,{Ad}),
-				 New
+			    Ad -> New = S#bsc_state{inhandoff=dict:store(MS,true,In)},
+				  #address{bsc=Obsc,newbsc=Nbsc} = Ad,
+				  if
+				      Obsc == Nbsc -> send_ho_command_newbs(New,{Ad});
+				      true         -> send_ho_req_msc(New,{Ad})
+				  end,
+				  New
 			end
     end,
     {noreply,NewS};
@@ -62,13 +66,21 @@ handle_cast({ho_command_newbsc,A},S) ->
     send_ho_command_newbs(S,{A}),
     {noreply,S};
 
-handle_cast({activation,A=#address{ms=MS}},S) ->
+handle_cast({activation,A=#address{ms=MS,bsc=Obsc,newbsc=Nbsc}},S) ->
     io:format("[BSC ~p] received activation~n",[self()]), 
     case findChannel(MS,S) of
-	{fail,NS} -> send_ho_ack_msc_fail(S,{A}),
-		     {noreply,NS};
-	{ok,H,NS} -> send_ho_ack_msc_ok(NS,{A,H}),
-		     {noreply,NS}
+	{fail,NS} -> 
+	    if
+		Obsc == Nbsc -> io:format("[BSC ~p] Call dropped for mobile ~p~n",[self(),A#address.ms]);
+		true         -> send_ho_ack_msc_fail(S,{A})
+	    end,
+	    {noreply,NS};
+	{ok,Ch,NS} -> 
+	    if
+		Obsc == Nbsc -> send_ho_ack_bs(S,{A,Ch});
+		true         -> send_ho_ack_msc_ok(NS,{A,Ch})
+	    end,
+	    {noreply,NS}
     end;
 
 handle_cast({ho_command_bsc,A,Ch},S) ->
@@ -76,9 +88,12 @@ handle_cast({ho_command_bsc,A,Ch},S) ->
     send_ho_ack_bs(S,{A,Ch}),
     {noreply,S};
 
-handle_cast({ho_conn_newbsc,A},S) ->
-    io:format("[BSC ~p] received ho conn newbsc~n",[self()]), 
-    send_ho_conn_msc(S,{A}),
+handle_cast({ho_conn_newbsc,A=#address{bsc=Obsc,newbsc=Nbsc}},S) ->
+    io:format("[BSC ~p] received ho conn newbsc~n",[self()]),
+    if
+	Obsc == Nbsc -> send_flush(S,{A});
+	true         -> send_ho_conn_msc(S,{A})
+    end,
     {noreply,S};
 
 handle_cast({ho_conn_bsc,A},S) ->
@@ -86,14 +101,17 @@ handle_cast({ho_conn_bsc,A},S) ->
     send_flush(S,{A}),
     {noreply,S};
 
-handle_cast({flush,A=#address{ms=MS}},S=#bsc_state{channels=C,allocated=Alc,inhandoff=In}) ->
+handle_cast({flush,A=#address{ms=MS,bsc=Obsc,newbsc=Nbsc}},S=#bsc_state{channels=C,allocated=Alc,inhandoff=In}) ->
     io:format("[BSC ~p] received flush ~n",[self()]),
     Occ = dict:fetch(MS,Alc),
     NAlc = dict:erase(MS,Alc),
     NC = [Occ|C],
     NIn = dict:erase(MS,In),
     NewS = S#bsc_state{channels=NC,allocated=NAlc,inhandoff=NIn},
-    send_flush_msc(NewS,{A}),
+    if
+	Obsc == Nbsc -> io:format("[BSC ~p] Flush completed ~n",[self()]);
+	true         -> send_flush_msc(NewS,{A})
+    end,
     {noreply,NewS}.
 
 terminate(_Reason,_State) ->

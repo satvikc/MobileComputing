@@ -4,7 +4,7 @@
 -import(bs).
 -import(bsc).
 -import(msc).
--export([start_normal/0,state/1]).
+-export([start_normal/0,state/1,start_intra/0,start_failure/0]).
 
 
 %% Implement flush
@@ -17,6 +17,19 @@ start_normal() ->
     register(bsc2,BSC2),
     {ok,BS1} = bs:start_link({BSC1}),
     {ok,BS2} = bs:start_link({BSC2}),
+    register(bs1,BS1),
+    register(bs2,BS2),
+    {ok,MS} = mobile:start_link({BS1,[BS2]}),
+    register(ms,MS),
+    timer:apply_after(6000,?MODULE,startHand,[]).
+
+start_intra() ->
+    {ok,MSC}  = msc:start_link(),
+    register(msc,MSC),				
+    {ok,BSC1} = bsc:start_link({MSC}),
+    register(bsc1,BSC1),
+    {ok,BS1} = bs:start_link({BSC1}),
+    {ok,BS2} = bs:start_link({BSC1}),
     register(bs1,BS1),
     register(bs2,BS2),
     {ok,MS} = mobile:start_link({BS1,[BS2]}),
@@ -53,3 +66,4 @@ start_failure() ->
     register(ms,MS),
     register(ms2,MS2),
     timer:apply_after(6000,?MODULE,startHand,[]).
+
