@@ -59,3 +59,10 @@ $ ms ! {endcall}.
   bs2 to which a mobile is already connected. So when ms tries to
   connect to bs2 a borrowing from bs22 takes place. bs11 is the
   cochannel of bs22 so the given channel is locked in bs11.
+
+* Helper functions 
+
+Suppose you want to see state of bs1.
+
+$ bs1 ! {self,get,state}.
+$ flush().
