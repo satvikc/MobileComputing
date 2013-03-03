@@ -26,26 +26,31 @@ send_link_active_request(A=#address{newbs=NewBS},Channel) ->
 init([Base,Bases]) ->
     SignalList = lists:map(fun(L) -> {L,random_number(100)} end,Bases),
     Signals = dict:from_list(SignalList),
-    S = #ms_state{bs=Base,signals=dict:store(Base,100,Signals)},
-    Channel = gen_server:call(Base,{getChannel,self()}),
-    case Channel of
-	none -> io:format("[Mobile ~p] Can not initiate call so terminating~n",[self()]),
-		{stop,"No Empty Channel"};
-	Ch ->   {ok,TRef} = timer:send_after(?MEASURETIME,{timer,measuretime}),
-		{ok, S#ms_state{tref=TRef,tch=Ch}}
-    end.
+    {ok,#ms_state{bs=Base,signals=dict:store(Base,100,Signals)}}.
+    %% case gen_server:call(Base,{startcall,self()}) of
+    %% 	{ok,Ch} -> 
+    %% 	    {ok,TRef} = timer:send_after(?MEASURETIME,{timer,measuretime}),
+    %% 	    io:format("[MS ~p] Call Started on Channel ~p~n",[self(),Ch]),
+    %% 	    {ok,S#ms_state{tref=TRef,tch=Ch,incall=true}};
+    %% 	{fail}  -> 
+    %% 	    io:format("[MS ~p] Call Dropped ~n",[self()]),
+    %% 	    {stop,"call dropped"}
+    %% end.
 
 %% Link active received. Update the BS to new BS and send link active
 %% request to the new BS
 handle_cast({link_active,A,ACh,Ch},S) ->
     io:format("[Mobile ~p] received link active on channel ~p~n",[self(),ACh]), 
     send_link_active_request(A,Ch),
-    {noreply,S#ms_state{bs=A#address.newbs}};
+    {noreply,S#ms_state{bs=A#address.newbs,tch=Ch}};
 
 %% Link establishment successful so call can continue on the new TCH.
 handle_cast({link_establishment,#address{newbs=NewBS},_},S) ->
     io:format("[MS ~p] Handover complete to BS ~p~n",[self(),NewBS]), 
-    {noreply,S#ms_state{bs=NewBS}}.
+    {noreply,S#ms_state{bs=NewBS}};
+
+handle_cast({switchChannel,Ch},S) ->
+    {noreply,S#ms_state{tch=Ch}}.
 
 %% helper call to check state
 handle_call({get,state},_,S) ->
@@ -64,7 +69,26 @@ handle_info({From,get,state},S) ->
 
 handle_info({_,set,signal,Val},S=#ms_state{bs=BS,signals=Sig}) ->
     NewS = S#ms_state{signals=dict:store(BS,Val,Sig)}, 
-    {noreply,NewS}.
+    {noreply,NewS};
+
+%% Ending call
+handle_info({endcall},S=#ms_state{bs=BS,tch=Ch,tref=TRef}) ->
+    io:format("[MS ~p] Call Ended ~n",[self()]), 
+    gen_server:cast(BS,{endcall,Ch,self()}),
+    _ = timer:cancel(TRef),
+    {noreply,S#ms_state{tch=none,incall=false}};
+
+%% Start call
+handle_info({startcall},S=#ms_state{bs=BS}) ->
+    io:format("[MS ~p] Call Starting ~n",[self()]), 
+    case gen_server:call(BS,{startcall,self()}) of
+	{ok,Ch} -> io:format("[MS ~p] Call Started on Channel ~p~n",[self(),Ch]),
+		   {ok,TRef} = timer:send_after(?MEASURETIME,{timer,measuretime}),
+		   {noreply,S#ms_state{tch=Ch,tref=TRef,incall=true}};
+	{fail}  -> io:format("[MS ~p] Call Dropped ~n",[self()]),
+		   {noreply,S#ms_state{tch=none,incall=false}}
+    end.
+
 
 terminate(_Reason,#ms_state{tref=TRef}) ->
     _ = timer:cancel(TRef),
@@ -72,6 +96,8 @@ terminate(_Reason,#ms_state{tref=TRef}) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
 
 %% Generates a random number in [1,Bound].
 random_number(Bound) ->

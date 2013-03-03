@@ -66,22 +66,21 @@ handle_cast({ho_command_newbsc,A},S) ->
     send_ho_command_newbs(S,{A}),
     {noreply,S};
 
-handle_cast({activation,A=#address{ms=MS,bsc=Obsc,newbsc=Nbsc}},S) ->
+handle_cast({activation,A=#address{bsc=Obsc,newbsc=Nbsc},Ch},S) ->
     io:format("[BSC ~p] received activation~n",[self()]), 
-    case findChannel(MS,S) of
-	{fail,NS} -> 
+    case Ch of
+	none -> 
 	    if
 		Obsc == Nbsc -> io:format("[BSC ~p] Call dropped for mobile ~p~n",[self(),A#address.ms]);
 		true         -> send_ho_ack_msc_fail(S,{A})
-	    end,
-	    {noreply,NS};
-	{ok,Ch,NS} -> 
+	    end;
+	_ -> 
 	    if
 		Obsc == Nbsc -> send_ho_ack_bs(S,{A,Ch});
-		true         -> send_ho_ack_msc_ok(NS,{A,Ch})
-	    end,
-	    {noreply,NS}
-    end;
+		true         -> send_ho_ack_msc_ok(S,{A,Ch})
+	    end
+    end,
+    {noreply,S};
 
 handle_cast({ho_command_bsc,A,Ch},S) ->
     io:format("[BSC ~p] received ho command bsc~n",[self()]), 
@@ -101,13 +100,10 @@ handle_cast({ho_conn_bsc,A},S) ->
     send_flush(S,{A}),
     {noreply,S};
 
-handle_cast({flush,A=#address{ms=MS,bsc=Obsc,newbsc=Nbsc}},S=#bsc_state{channels=C,allocated=Alc,inhandoff=In}) ->
+handle_cast({flush,A=#address{ms=MS,bsc=Obsc,newbsc=Nbsc}},S=#bsc_state{inhandoff=In}) ->
     io:format("[BSC ~p] received flush ~n",[self()]),
-    Occ = dict:fetch(MS,Alc),
-    NAlc = dict:erase(MS,Alc),
-    NC = [Occ|C],
     NIn = dict:erase(MS,In),
-    NewS = S#bsc_state{channels=NC,allocated=NAlc,inhandoff=NIn},
+    NewS = S#bsc_state{inhandoff=NIn},
     if
 	Obsc == Nbsc -> io:format("[BSC ~p] Flush completed ~n",[self()]);
 	true         -> send_flush_msc(NewS,{A})
@@ -128,16 +124,16 @@ handle_info(_,S) ->
     {noreply,S}.
 
 %% helper call to check state
-handle_call({getChannel,MS},_,S) ->
-    case findChannel(MS,S) of
-	{fail,NS} -> {reply,none,NS};
-	{ok,H,NewS} -> {reply,H,NewS}
-    end;
+%% handle_call({getChannel,MS},_,S) ->
+%%     case findChannel(MS,S) of
+%% 	{fail,NS} -> {reply,none,NS};
+%% 	{ok,H,NewS} -> {reply,H,NewS}
+%%     end;
 
 handle_call({connect,BS},_,S=#bsc_state{channels=Chs,bss=BSS}) ->
-    NBSS = set:add_element(BS,BSS),
-    [CA|CARest] = buckets(length(NBSS),Chs),
-    Allocation = lists:zip(set:to_list(BSS),CARest),
+    NBSS = sets:add_element(BS,BSS),
+    [CA|CARest] = buckets(sets:size(NBSS),Chs),
+    Allocation = lists:zip(sets:to_list(BSS),CARest),
     lists:foreach(fun({B,C}) -> gen_server:cast(B,{allocatedChannels,C}) end, Allocation),
     {reply,CA,S#bsc_state{bss=NBSS}};
     
@@ -162,12 +158,12 @@ maxInDict(D) ->
     BS.
 		      
 
-findChannel(MS,S=#bsc_state{channels=Chs,allocated=Alc}) ->
-    case Chs of
-	[] -> {fail,S};
-	[H|T] -> NewS=S#bsc_state{allocated=dict:store(MS,H,Alc),channels=T},
-		 {ok,H,NewS}
-    end.
+%% findChannel(MS,S=#bsc_state{channels=Chs,allocated=Alc}) ->
+%%     case Chs of
+%% 	[] -> {fail,S};
+%% 	[H|T] -> NewS=S#bsc_state{allocated=dict:store(MS,H,Alc),channels=T},
+%% 		 {ok,H,NewS}
+%%     end.
 
 -spec buckets(pos_integer(),list()) -> list(list()).
 buckets(1,L) -> [L];

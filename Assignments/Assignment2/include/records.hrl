@@ -1,5 +1,5 @@
 -record(address,{ms=none,bs=none,bsc=none,msc=none,newbsc=none,newbs=none}).
--record(bs_state, {bsc,low=[],high=[],borrowed=[],allocated=dict:new(),given=dict:new(),cochannel=set:new(),neighbours=set:new(),locked=dict:new()}).
--record(ms_state, {bs,signals,tch=none,tref=none}).
--record(bsc_state, {msc,bss=set:new(),allocated=dict:new(),channels=[],inhandoff=dict:new()}).
+-record(bs_state, {bsc,low=[],high=[],borrowed=[],allocated=dict:new(),given=dict:new(),cochannel=[],neighbours=[],locked=dict:new()}).
+-record(ms_state, {bs,signals,tch=none,tref=none,incall=false}).
+-record(bsc_state, {msc,bss=sets:new(),allocated=dict:new(),channels=[],inhandoff=dict:new()}).
 -record(msc_state, {}).
