@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 -include("../include/constants.hrl").
 -include("../include/records.hrl").
--export([start_link/1,init/1,handle_cast/2,handle_call/3,handle_info/2,code_change/3,terminate/2]).
+-export([start_link/1,init/1,handle_cast/2,handle_call/3,handle_info/2,code_change/3,terminate/2,buckets/2]).
 
 start_link({MSC}) ->
     gen_server:start_link(?MODULE,[MSC],[]).
@@ -134,6 +134,13 @@ handle_call({getChannel,MS},_,S) ->
 	{ok,H,NewS} -> {reply,H,NewS}
     end;
 
+handle_call({connect,BS},_,S=#bsc_state{channels=Chs,bss=BSS}) ->
+    NBSS = set:add_element(BS,BSS),
+    [CA|CARest] = buckets(length(NBSS),Chs),
+    Allocation = lists:zip(set:to_list(BSS),CARest),
+    lists:foreach(fun({B,C}) -> gen_server:cast(B,{allocatedChannels,C}) end, Allocation),
+    {reply,CA,S#bsc_state{bss=NBSS}};
+    
 handle_call({get,state},_,S) ->
     {reply,S,S}.
 
@@ -151,7 +158,7 @@ takeDecision(A=#address{bs=BS},Dict,#bsc_state{msc=MSC}) ->
 maxInDict(D) ->
     {BS,_} = dict:fold(fun (K,V,{OK,OV}) -> if V > OV -> {K,V};
 					       true   -> {OK,OV}
-					    end end,{none,-1},D),				     
+					    end end,{none,-1},D),
     BS.
 		      
 
@@ -161,3 +168,27 @@ findChannel(MS,S=#bsc_state{channels=Chs,allocated=Alc}) ->
 	[H|T] -> NewS=S#bsc_state{allocated=dict:store(MS,H,Alc),channels=T},
 		 {ok,H,NewS}
     end.
+
+-spec buckets(pos_integer(),list()) -> list(list()).
+buckets(1,L) -> [L];
+buckets(N, L) ->
+    NN = length(L) div N,
+    NC = length(L) / N,
+    NewNN = if
+		NN==NC -> NN ;
+		true   -> NN + 1
+	    end,
+    {Hd,Rest} = lists:split(NewNN,L),
+    [Hd | buckets(N-1,Rest)].
+		       
+    
+
+-spec ceiling(float()) -> integer().
+ceiling(X) when X < 0 ->
+    trunc(X);
+ceiling(X) ->
+    T = trunc(X),
+    case X - T == 0 of
+        true -> T;
+        false -> T + 1
+    end.    
