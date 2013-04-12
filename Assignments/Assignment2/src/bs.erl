@@ -81,6 +81,7 @@ handle_cast({allocatedChannels,C},S) ->
     {noreply,S#bs_state{low=lists:sort(L),high=lists:sort(H)}};
 
 handle_cast({unlockChannel,Ch,BS},S=#bs_state{high=H,locked=Lck}) ->
+    io:format("[BS ~p] Unlock Channel ~p for BS ~p~n",[self(),Ch,BS]),
     case dict:is_key(Ch,Lck) of
 	true -> case removeLock(Ch,BS,Lck) of
 		    {complete,l,NLck} ->
@@ -103,6 +104,7 @@ handle_cast({endcall,Ch,MS},S) ->
     {noreply,NS};
 
 handle_cast({returnChannel,Ch,BS},S) ->
+    io:format("[BS ~p] Return Channel ~p to BS ~p~n",[self(),Ch,BS]),
     NS = returnChannel(BS,Ch,S),
     {noreply,NS};
 
@@ -151,6 +153,7 @@ handle_call({isfreeChannel,Ch},_,S) ->
     {reply,isFreeChannel(Ch,S),S};
 
 handle_call({lockChannel,Ch,BS},_,S=#bs_state{low=L,high=H,locked=Lck}) ->
+    io:format("[BS ~p] Lock Channel ~p for BS ~p ~n",[self(),Ch,BS]),
     case isFreeChannel(Ch,S) of
 	true -> case lists:member(Ch,L) of
 		    true -> NL = lists:delete(Ch,L),
@@ -250,6 +253,7 @@ switchingRule1(Ch,S=#bs_state{low=L,allocated=Alc}) -> %% First.
 	  io:format("[BS ~p] Switching Rule 1 applied~n",[self()]),
 	  if
 	      Ch1 > Ch -> switchChannel(Ch,MS1),
+			  io:format("[BS ~p] Switching channel ~p to ~p for ~p ~n",[self(),Ch1,Ch,MS1]),
 			  S#bs_state{allocated=dict:store(MS1,Ch,Alc),low=lists:sort([Ch1|L])};
 	      true -> S#bs_state{low=lists:sort([Ch|L])}
 	  end
@@ -280,18 +284,35 @@ switchChannelBS(Ch,Ch1,BS) ->
 returnChannel(_,Ch,S=#bs_state{high=H,given=G,cochannel=Co}) ->
     NG = dict:erase(Ch,G),
     SG = lists:sort(fun({A,_},{B,_}) -> A >= B end,dict:to_list(NG)), %% Third Switching rule
+    %%io:format("[BS ~p] G ~p NG ~p SG ~p~n",[self(),G,NG,SG]),
     case SG of
 	[] -> unlockAll(Ch,Co),
 	      NH = lists:sort([Ch|H]),
 	      S#bs_state{high=NH,given=NG};
-	[{BS1,Ch1}|_] ->
+	[{Ch1,[BS1]}|_] ->
 	    io:format("[BS ~p] Switching Rule 3 applied~n",[self()]),
 	    if
-		Ch1 > Ch -> switchChannelBS(Ch,Ch1,BS1),
-			    NNG = dict:store(Ch,BS1,dict:erase(Ch1,NG)),
-			    NH = lists:sort([Ch1|H]),
-			    unlockAll(Ch1,Co),
-			    S#bs_state{high=NH,given=NNG};
+		Ch1 > Ch -> 
+		    io:format("[BS ~p] Ch1 ~p Ch ~p BS1 ~p~n",[self(),Ch1,Ch,BS1]),
+		    switchChannelBS(Ch,Ch1,BS1),
+		    NNG = dict:store(Ch,BS1,dict:erase(Ch1,NG)),
+		    NH = lists:sort([Ch1|H]),
+		    unlockAll(Ch1,Co),
+		    S#bs_state{high=NH,given=NNG};
+		true -> unlockAll(Ch,Co),
+			NH = lists:sort([Ch|H]),
+			S#bs_state{high=NH,given=NG}
+	    end;
+	[{Ch1,BS1}|_] ->
+	    io:format("[BS ~p] Switching Rule 3 applied~n",[self()]),
+	    if
+		Ch1 > Ch -> 
+		    io:format("[BS ~p] Ch1 ~p Ch ~p BS1 ~p~n",[self(),Ch1,Ch,BS1]),
+		    switchChannelBS(Ch,Ch1,BS1),
+		    NNG = dict:store(Ch,BS1,dict:erase(Ch1,NG)),
+		    NH = lists:sort([Ch1|H]),
+		    unlockAll(Ch1,Co),
+		    S#bs_state{high=NH,given=NNG};
 		true -> unlockAll(Ch,Co),
 			NH = lists:sort([Ch|H]),
 			S#bs_state{high=NH,given=NG}

@@ -49,7 +49,8 @@ handle_cast({link_establishment,#address{newbs=NewBS},_},S) ->
     io:format("[MS ~p] Handover complete to BS ~p~n",[self(),NewBS]), 
     {noreply,S#ms_state{bs=NewBS}};
 
-handle_cast({switchChannel,Ch},S) ->
+handle_cast({switchChannel,Ch},S=#ms_state{tch=Ch1}) ->
+    io:format("[MS ~p] Switch Channel from ~p to ~p ~n",[self(),Ch1,Ch]),
     {noreply,S#ms_state{tch=Ch}}.
 
 %% helper call to check state

@@ -1,4 +1,5 @@
 # Description
+
 The code is implemented in erlang.
 
 * Compiling
@@ -52,17 +53,30 @@ $ ms ! {endcall}.
 $ erl
 $ l(start).
 $ start:start_switch2().
-$ ms2 ! {endcall}.
-$ ms ! {endcall}.
+$ ms2 ! {endcall}. %% start:endc2().
+$ ms ! {endcall}.  %% start:endc().
 
 * This is similar to above but now only one channel is available at
   bs2 to which a mobile is already connected. So when ms tries to
   connect to bs2 a borrowing from bs22 takes place. bs11 is the
   cochannel of bs22 so the given channel is locked in bs11.
 
+# Demo 4 for channel borrowing 
+
+* Assuming code is compiled and you are in ebin directory
+
+$ erl
+$ l(start).
+$ start:start_switch3().
+$ start:endc().
+$ start:endc2().
+$ start:endc3().
+
+* Demo for switching rule 3
+
 * Helper functions 
 
 Suppose you want to see state of bs1.
 
-$ bs1 ! {self,get,state}.
+$ bs1 ! {self(),get,state}.
 $ flush().
